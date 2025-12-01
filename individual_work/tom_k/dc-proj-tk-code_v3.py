@@ -23,7 +23,14 @@ def to_year_rating(rec):
     return (year, (float(rating), 1))
 
 
-def save_year_stats(spark, year_results, output_path: str):
+def save_year_stats(year_results, output_path: str):
+    """
+    Take (year, (avg_rating, count)) pairs and write them as a CSV to output_path.
+    This function grabs a SparkSession internally, so we don't need to pass spark.
+    """
+    # Get or create a SparkSession (will reuse the existing SparkContext)
+    spark = SparkSession.builder.getOrCreate()
+
     rows = [
         (int(year), float(stats[0]), int(stats[1]))
         for year, stats in year_results
@@ -80,9 +87,9 @@ def main():
     for year, (avg, cnt) in year_results:
         print(f"{year}: avg_rating={avg:.3f}, count={cnt}")
 
-    save_year_stats(spark, year_results, output_path)
+    save_year_stats(year_results, output_path)
 
-    spark.stop()
+    sc.stop()
 
 
 if __name__ == "__main__":
