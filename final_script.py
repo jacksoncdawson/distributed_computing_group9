@@ -407,7 +407,7 @@ def overview_cds_and_vinyl():
         Pure RDD version: write CSV via saveAsTextFile, no pyspark.sql.
         year_results is a list of (year, (avg_rating, count)).
         """
-        sc = pyspark.SparkContext.getOrCreate()
+        sc = SparkContext.getOrCreate()
 
         # Prepare header + data lines
         header = "year,avg_rating,num_ratings"
@@ -429,7 +429,7 @@ def overview_cds_and_vinyl():
     data_path = f'gs://msds-694-cohort-14-group9/data/{category}.jsonl'
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     output_path = f'gs://msds-694-cohort-14-group9/output/{category}_yearly_avg_ratings_{ts}/'
-    sc = pyspark.SparkContext(appName="CDsAndVinylRDD").getOrCreate()
+    sc = SparkContext(appName="CDsAndVinylRDD").getOrCreate()
     sc.setLogLevel("ERROR")
 
     path = str(data_path)
