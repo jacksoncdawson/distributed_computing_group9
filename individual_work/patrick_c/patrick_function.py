@@ -4,7 +4,6 @@ import pyspark
 import nltk # pip install nltk
 from nltk.corpus import stopwords
 
-
 def analyze_electronics_reviews():
 
     # For uploading data
@@ -12,18 +11,8 @@ def analyze_electronics_reviews():
     filename = "Electronics.jsonl"
     path = f"gs://{bucket}/{filename}"
 
-    data = []
-
-    with open(path, "r") as f:
-        for i, line in enumerate(f):
-            data.append(json.loads(line))
-
     sc = pyspark.SparkContext()
-    base_rdd = sc.parallelize(data)
-
-    # RDD to be passed into each function
-    sc = pyspark.SparkContext()
-    base_rdd = sc.parallelize(data)
+    base_rdd = sc.textFile(path).map(json.loads)
 
     def get_average_length_by_rating(base_rdd):
 
@@ -70,5 +59,7 @@ def analyze_electronics_reviews():
     rating_lengths, top_words = get_average_length_by_rating(base_rdd), get_top_words_by_rating(base_rdd)
     print(rating_lengths)
     print(top_words)
+
+    sc.stop()
 
     return rating_lengths, top_words

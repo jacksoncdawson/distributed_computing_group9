@@ -415,5 +415,3 @@ if __name__ == "__main__":
     process_kindle_reviews_full()
     # Run Patrick's Script
     analyze_electronics_reviews()
-    
-    
