@@ -382,7 +382,8 @@ def overview_cds_and_vinyl():
     print("\nStarting overview for CDs and Vinyl category...\n")
     category = "CDs_and_Vinyl"
     data_path = f'gs://msds-694-cohort-14-group9/data/{category}.jsonl'
-    output_path = f'gs://msds-694-cohort-14-group9/output/{category}_yearly_avg_ratings/'
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    output_path = f'gs://msds-694-cohort-14-group9/output/{category}_yearly_avg_ratings_{ts}/'
     sc = pyspark.SparkContext(appName="CDsAndVinylRDD").getOrCreate()
     sc.setLogLevel("ERROR")
 
