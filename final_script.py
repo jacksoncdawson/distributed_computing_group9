@@ -224,10 +224,126 @@ def analyze_books_vs_videogames():
     sc.stop()
 
 
+# Define Paul's Function
+from pyspark import SparkConf, SparkContext
+import json
+
+def process_kindle_reviews_full():
+    sc = SparkContext()
+    
+    rdd = sc.textFile("gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl")
+
+    parsed_rdd = rdd.map(lambda line: json.loads(line))
+
+    sample_rdd = parsed_rdd.takeSample(False, 5000, seed=42)
+    sample_rdd = sc.parallelize(sample_rdd)
+
+    sample_rdd = sample_rdd.map(
+        lambda x: (
+            str(x.get('asin', '')),
+            str(x.get('parent_asin', '')),
+            str(x.get('title', '')),
+            str(x.get('text', '')),
+            float(x.get('rating', 0.0)),
+            int(x.get('timestamp', 0)),
+            str(x.get('user_id', '')),
+            bool(x.get('verified_purchase', False)),
+            int(x.get('helpful_vote', 0)),
+            int(len(x.get('images', [])))
+        )
+    )
+
+    # Filter for verified reviews
+
+    valid_reviews = sample_rdd.filter(lambda x: x[7] == True)
+
+    # Print sample of RDDs
+    print("Sample RDD (first 5 rows):")
+    print(sample_rdd.take(5))
+
+    print("Valid (verified purchase) reviews (first 5 rows):")
+    print(valid_reviews.take(5))
+
+    # STATISTICS ON RATINGS
+
+    ratings = valid_reviews.map(lambda x: x[4])
+
+    count = ratings.count()
+    mean = ratings.mean()
+    stdev = ratings.stdev()
+    min_val = ratings.min()
+    max_val = ratings.max()
+
+    print("\nRating Summary:")
+    print((count, mean, stdev, min_val, max_val))
+
+    # AVG RATING BY # OF HELPFUL VOTES
+    pair_rdd = valid_reviews.map(lambda x: (x[8], (x[4], 1)))
+
+    reduced = pair_rdd.reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1]))
+
+    avg_ratings = reduced.mapValues(lambda x: (x[0] / x[1], x[1]))
+
+    result = avg_ratings.sortByKey()
+
+    print("\n(# helpful votes → (avg rating, # reviews)):")
+    for row in result.take(40):
+        print(row)
+
+    # GOOD vs NOT-GOOD (>=4 stars)
+    good = valid_reviews.map(lambda x: (1 if x[4] >= 4 else 0, 1))
+    counts_good = good.reduceByKey(lambda x, y: x + y)
+
+    print("\nGood review counts (>=4 stars):")
+    print(counts_good.collect())
+
+    # BAD vs NOT-BAD (<3 stars)
+    bad = sample_rdd.map(lambda x: (1 if x[4] < 3 else 0, 1))
+    counts_bad = bad.reduceByKey(lambda x, y: x + y)
+
+    print("\nBad review counts (<3 stars):")
+    print(counts_bad.collect())
+
+    # AVG TEXT LENGTH OF VALID REVIEWS
+    comb = valid_reviews.map(lambda x: (len(x[3]), 1))
+
+    sum_length, count_length = comb.reduce(lambda x, y: (x[0] + y[0], x[1] + y[1]))
+    avg_length = sum_length / count_length
+
+    print("\nAverage length of review text (overall):")
+    print(avg_length)
+
+    # AVG TEXT LENGTH BY RATING
+    pair_rdd_len = valid_reviews.map(lambda x: (x[4], (len(x[3]), 1)))
+
+    reduced_len = pair_rdd_len.reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1]))
+
+    avgLen = reduced_len.mapValues(lambda x: x[0] / x[1])
+
+    print("\nAverage review length by star rating:")
+    for row in avgLen.sortByKey().collect():
+        print(row)
+
+    # Return everything 
+    return {
+        "sample_rdd": sample_rdd,
+        "valid_reviews": valid_reviews,
+        "rating_summary": (count, mean, stdev, min_val, max_val),
+        "helpful_vote_stats": result.take(40),
+        "good_counts": counts_good.collect(),
+        "bad_counts": counts_bad.collect(),
+        "avg_review_length": avg_length,
+        "avg_length_by_rating": avgLen.collect()
+    }
+
+
 # --- RUN SCRIPTS ---
 
 if __name__ == "__main__":
     
     # Run Jack's Script
     analyze_books_vs_videogames()
+    # Run Paul's
+    process_kindle_reviews_full()
+    
     
