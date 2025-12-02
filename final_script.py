@@ -3,9 +3,9 @@ import json
 import math
 from datetime import datetime
 
-# change when ready to push to GCS
-books_path = "distributed_computing_group9/data_samples/Books_SAMPLE.jsonl"
-video_games_path = "distributed_computing_group9/data_samples/Video_Games_SAMPLE.jsonl"
+# GCS Paths
+books_path = "gs://msds-694-cohort-14-group9/data/Books.jsonl"
+video_games_path = "gs://msds-694-cohort-14-group9/data/Video_Games.jsonl"
 
 
 # --- SCRIPT DEFINITIONS ---
@@ -21,6 +21,8 @@ def analyze_books_vs_videogames():
     - Computes side-by-side comparison statistics
     - Provides detailed breakdowns of ratings, review lengths, helpfulness, and verified purchases
     """
+
+
 
     # Setup SparkContext
     sc = SparkContext.getOrCreate()
@@ -238,7 +240,7 @@ import os
 GCS_INPUT_PATH = "gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl"
 GCS_OUTPUT_BUCKET = "gs://msds-694-cohort-14-group9/output" # Use your bucket name here
 
-# Helper Function for Saving Visualizations to GCS 
+# Helper Function for Saving Visualizations to GCS
 def save_chart_image_to_gcs(data, chart_type, title, x_label, y_label, filename, gcs_output_path):
     """Generates a chart and saves the image file directly to a GCS path."""
     
@@ -479,5 +481,3 @@ if __name__ == "__main__":
     process_kindle_reviews_full()
     # Run Tom's
     overview_cds_and_vinyl()
-    
-    
