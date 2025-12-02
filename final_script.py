@@ -1,13 +1,19 @@
 from pyspark import SparkContext
 import json
 import math
-from collections import defaultdict
+
+# change when ready to push to GCS
+books_path = "distributed_computing_group9/data_samples/Books_SAMPLE.jsonl"
+video_games_path = "distributed_computing_group9/data_samples/Video_Games_SAMPLE.jsonl"
 
 
+# --- SCRIPT DEFINITIONS ---
+
+# Define Jack's Script
 def analyze_books_vs_videogames():
     """
     Analyze consumer sentiment differences between video-game products and book products.
-    
+
     This function:
     - Loads Books and Video Games sample data
     - Merges the datasets with category labels
@@ -19,8 +25,8 @@ def analyze_books_vs_videogames():
     sc = SparkContext.getOrCreate()
 
     # Read JSONL files as text RDDs and parse each line
-    vg_rdd = sc.textFile("../../data_samples/Video_Games_SAMPLE.jsonl").map(json.loads)
-    b_rdd = sc.textFile("../../data_samples/Books_SAMPLE.jsonl").map(json.loads)
+    vg_rdd = sc.textFile(video_games_path).map(json.loads)
+    b_rdd = sc.textFile(books_path).map(json.loads)
 
     # Add category field to each record
     vg_rdd = vg_rdd.map(lambda row: {**row, "category": "video_game"})
@@ -126,8 +132,10 @@ def analyze_books_vs_videogames():
         .collect()
     )
 
-    rating_by_category = defaultdict(lambda: {"book": 0, "video_game": 0})
+    rating_by_category = {}
     for (category, rating), count in rating_counts:
+        if rating not in rating_by_category:
+            rating_by_category[rating] = {"book": 0, "video_game": 0}
         rating_by_category[rating][category] = count
 
     print(f"{'rating':<10} {'book':<15} {'video_game':<15}")
@@ -216,5 +224,10 @@ def analyze_books_vs_videogames():
     sc.stop()
 
 
+# --- RUN SCRIPTS ---
+
 if __name__ == "__main__":
+    
+    # Run Jack's Script
     analyze_books_vs_videogames()
+    
