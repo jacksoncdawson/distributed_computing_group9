@@ -43,8 +43,7 @@ def overview_cds_and_vinyl():
 
         # One output file, plain text CSV
         (
-            rdd.coalesce(1)
-            .saveAsTextFile(output_path)
+        rdd.coalesce(1).saveAsTextFile(output_path)
         )
 
     print("\nStarting overview for CDs and Vinyl category...\n")
