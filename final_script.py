@@ -1,6 +1,7 @@
 from pyspark import SparkContext
 import json
 import math
+from datetime import datetime
 
 # change when ready to push to GCS
 books_path = "distributed_computing_group9/data_samples/Books_SAMPLE.jsonl"
