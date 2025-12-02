@@ -337,6 +337,74 @@ def process_kindle_reviews_full():
     }
 
 
+# Define Patricks function
+from smart_open import open
+import json
+import pyspark
+import nltk # pip install nltk
+from nltk.corpus import stopwords
+
+def analyze_electronics_reviews():
+
+    # For uploading data
+    bucket = "msds-694-cohort-14-group9/data"
+    filename = "Electronics.jsonl"
+    path = f"gs://{bucket}/{filename}"
+
+    sc = pyspark.SparkContext()
+    base_rdd = sc.textFile(path).map(json.loads)
+
+    def get_average_length_by_rating(base_rdd):
+
+        average_review_length_by_rating = {}
+        for i in range(5):
+            rating = i+1
+            filtered_rdd = base_rdd.filter(lambda x: int(x['rating']) == rating)
+            review_lengths = filtered_rdd.map(lambda x: len(x['text']))
+            average_review_length = review_lengths.reduce(lambda x, y: x+y)/filtered_rdd.count()
+
+            average_review_length_by_rating[rating] = round(average_review_length, 2)
+        
+        return average_review_length_by_rating
+
+    def get_top_words_by_rating(base_rdd):
+
+        nltk.download('stopwords')
+        stop_words = set(stopwords.words('english'))
+
+        def parse_review(text):
+            problem_chars = ['.','><br','/', '-']
+            filtered_text = text.lower()
+            for c in problem_chars:
+                filtered_text = filtered_text.replace(c,'')
+            return filtered_text.split(' ')
+
+        top_words_by_rating = {}
+        for i in range(5):
+            rating = i+1
+            filtered_rdd = base_rdd.filter(lambda x: int(x['rating']) == rating)
+            word_rdd = filtered_rdd.flatMap(lambda x: parse_review(x['text']))
+            clean_word_rdd = word_rdd.filter(lambda x: x not in stop_words and x not in ['', '>'])
+
+            n = clean_word_rdd.count()
+            
+            word_counts = clean_word_rdd.map(lambda word: (word, 1)).reduceByKey(lambda x, y: x + y)
+            sorted_word_counts = word_counts.sortBy(lambda x: x[1], ascending=False)
+            sorted_word_ratios = sorted_word_counts.mapValues(lambda x: round(x/n, 5))
+
+            top_words_by_rating[rating] = sorted_word_ratios.take(10)
+
+        return top_words_by_rating
+    
+    rating_lengths, top_words = get_average_length_by_rating(base_rdd), get_top_words_by_rating(base_rdd)
+    print(rating_lengths)
+    print(top_words)
+
+    sc.stop()
+
+    return rating_lengths, top_words
+
+
 # --- RUN SCRIPTS ---
 
 if __name__ == "__main__":
@@ -345,5 +413,7 @@ if __name__ == "__main__":
     analyze_books_vs_videogames()
     # Run Paul's
     process_kindle_reviews_full()
+    # Run Patrick's Script
+    analyze_electronics_reviews()
     
     
