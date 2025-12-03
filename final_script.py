@@ -723,18 +723,15 @@ def analyze_books_vs_videogames(sc):
 # --- RUN SCRIPTS ---
 
 if __name__ == "__main__":
-    
+
     # Create a single SparkContext for all analyses
     print("Initializing Spark...")
     conf = SparkConf().setAppName("GroupAnalysis")
     sc = SparkContext(conf=conf)
     sc.setLogLevel("WARN")
-    
+
     try:
-        # Run Jack's Script
-        print("\n" + "="*80)
-        analyze_books_vs_videogames(sc)
-        
+
         # Run Paul's
         print("\n" + "="*80)
         # Usage
@@ -746,22 +743,25 @@ if __name__ == "__main__":
         print(results["avg_length"])
         print(results["avg_length_by_rating"])
 
-        
         # Run Patrick's Script
         print("\n" + "="*80)
         analyze_electronics_reviews(sc)
-        
+
         # Run Tom's
         print("\n" + "="*80)
         overview_cds_and_vinyl(sc)
-        
+
         # Run Seb's
         print("\n" + "="*80)
         analyze_ratings_from_file(sc, video_games_path)
-        
+
+        # Run Jack's Script
+        print("\n" + "=" * 80)
+        analyze_books_vs_videogames(sc)
+
         print("\n" + "="*80)
         print("All analyses completed successfully!")
-        
+
     except Exception as e:
         print(f"Error occurred: {str(e)}")
         import traceback
