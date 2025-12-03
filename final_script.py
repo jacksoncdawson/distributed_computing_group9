@@ -551,3 +551,215 @@ if __name__ == "__main__":
     analyze_electronics_reviews()
     # Run Tom's
     overview_cds_and_vinyl()
+
+# Seb's Function
+def analyze_ratings_from_file(file_path):
+    """
+    Full pipeline:
+      1. Read newline-delimited JSON reviews from `file_path` into an RDD.
+      2. Cast fields to proper types.
+      3. Compute average rating & helpfulness per user.
+      4. Calibrate user ratings to have mean 3.0 (for users with ≥ min_reviews_per_user).
+      5. Compute per-ASIN original vs calibrated averages.
+      6. Plot original vs calibrated product averages.
+      
+    Only argument required: file_path (string).
+    """
+
+    import json
+    from datetime import datetime
+    import matplotlib.pyplot as plt
+
+    import pyspark
+    from pyspark.sql import SparkSession
+
+    sc = pyspark.SparkContext.getOrCreate()
+    spark = SparkSession.builder.getOrCreate()
+
+    # Helper to create the typed RDD
+    def createRDD(sc, file_path, field_order, types):
+        raw_rdd = sc.textFile(file_path)
+
+        def parse_json_line(line):
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                return None 
+
+        def has_value(x):
+            return x is not None and x != ""
+
+        casters = {
+            "int":   lambda x: int(x) if has_value(x) else None,
+            "float": lambda x: float(x) if has_value(x) else None,
+            "str":   lambda x: x if x is not None else "",
+            "bool":  lambda x: (
+                x if isinstance(x, bool)
+                else (x.lower() in ("1", "true", "t", "yes", "y")) if has_value(x)
+                else None
+            ),
+            "date":  lambda x: datetime.fromtimestamp(x / 1000.0).date() if has_value(x) else None
+        }
+
+        def cast_row_to_dict(record):
+            casted_dict = {}
+            for i, name in enumerate(field_order):
+                value = record.get(name)
+                target_type = types[i]
+                casted_dict[name] = casters[target_type](value)
+            return casted_dict
+
+        return (
+            raw_rdd
+            .map(parse_json_line)
+            .filter(lambda x: x is not None)
+            .map(cast_row_to_dict)
+        )
+
+    # Average rating & helpfulness by user
+    def avg_rate_by_user(rdd):
+        # (user_id, (rating, helpful_vote))
+        user_pairs_rdd = rdd.map(lambda x: (x['user_id'], (x['rating'], x['helpful_vote'])))
+
+        createCombiner   = lambda value: (value[0], value[1], 1)
+        mergeValue       = lambda acc, val: (acc[0] + val[0], acc[1] + val[1], acc[2] + 1)
+        mergeCombiners   = lambda a1, a2: (a1[0] + a2[0], a1[1] + a2[1], a1[2] + a2[2])
+
+        combined_totals_rdd = user_pairs_rdd.combineByKey(
+            createCombiner,
+            mergeValue,
+            mergeCombiners
+        )
+
+        averages_rdd = combined_totals_rdd.map(
+            lambda kv: {
+                "user_id": kv[0],
+                "avg_rating": round(kv[1][0] / kv[1][2], 2),
+                "avg_helpfulness": round(kv[1][1] / kv[1][2], 2),
+                "review_count": kv[1][2]
+            }
+        )
+
+        # Sort by avg_helpfulness desc
+        rdd_to_sort = averages_rdd.map(
+            lambda record_dict: (record_dict['avg_helpfulness'], record_dict)
+        )
+        sorted_pair_rdd = rdd_to_sort.sortByKey(ascending=False)
+        sorted_results_rdd = sorted_pair_rdd.map(lambda kv: kv[1])
+
+        return sorted_results_rdd
+
+    # Calibrated ratings per user
+    def calibrated_ratings_per_user(avg_rating_per_user_rdd, ratings_rdd, min_reviews_per_user=3):
+        """
+        Recalibrate ratings so each user's average rating becomes 3.0.
+        Optionally ignore users with fewer than `min_reviews_per_user` reviews.
+        """
+
+        # (user_id, (avg_rating, review_count))
+        avg_by_user_rdd = avg_rating_per_user_rdd.map(
+            lambda d: (d["user_id"], (d["avg_rating"], d["review_count"]))
+        )
+
+        # (user_id, review_dict)
+        ratings_by_user_rdd = ratings_rdd.map(
+            lambda d: (d["user_id"], d)
+        )
+
+        # (user_id, (review_dict, (avg_rating, review_count)))
+        joined_rdd = ratings_by_user_rdd.join(avg_by_user_rdd)
+
+        # use users with at least N reviews
+        filtered_rdd = joined_rdd.filter(
+            lambda kv: kv[1][1][1] >= min_reviews_per_user
+        )
+
+        def apply_calibration(kv):
+            user_id, (review_dict, (avg_rating, review_count)) = kv
+
+            shift = 3.0 - avg_rating
+            new_review = review_dict.copy()
+            raw_calibrated = new_review["rating"] + shift
+
+            calibrated = max(1.0, min(5.0, raw_calibrated))
+            new_review["calibrated_rating"] = round(calibrated, 2)
+
+            return new_review
+
+        calibrated_rdd = filtered_rdd.map(apply_calibration)
+        return calibrated_rdd
+
+    # Average rating by product helper
+    def avg_rating_by_asin(rdd, rating_key):
+        # (asin, (sum_rating, count))
+        pair_rdd = rdd.map(lambda x: (x['asin'], (x[rating_key], 1)))
+        summed_rdd = pair_rdd.reduceByKey(
+            lambda a, b: (a[0] + b[0], a[1] + b[1])
+        )
+        # (asin, (avg_rating, count))
+        return summed_rdd.map(
+            lambda kv: (kv[0], (kv[1][0] / kv[1][1], kv[1][1]))
+        )
+
+    # Pipeline
+    fields = [
+        "rating", "title", "text", "images", "asin", "parent_asin",
+        "user_id", "timestamp", "helpful_vote", "verified_purchase"
+    ]
+    types = ["int", "str", "str", "str", "str", "str", "str", "date", "int", "bool"]
+
+    # Load and cast data
+    ratings_rdd = createRDD(sc, file_path, fields, types)
+
+    # Average rating per user
+    avg_rating_per_user_rdd = avg_rate_by_user(ratings_rdd)
+
+    # Calibrated ratings (using 3+ reviews as in your example)
+    calib_rate_rdd = calibrated_ratings_per_user(
+        avg_rating_per_user_rdd,
+        ratings_rdd,
+        min_reviews_per_user=3
+    )
+
+    # Original vs calibrated averages per product
+    orig_avg_by_asin_rdd = avg_rating_by_asin(ratings_rdd, 'rating')
+    calib_avg_by_asin_rdd = avg_rating_by_asin(calib_rate_rdd, 'calibrated_rating')
+
+    # (asin, ((orig_avg, orig_count), (calib_avg, calib_count)))
+    joined_rdd = orig_avg_by_asin_rdd.join(calib_avg_by_asin_rdd)
+
+    # Keep only products with more than 10 ratings (using original count)
+    filtered_rdd = joined_rdd.filter(lambda kv: kv[1][0][1] > 5)
+
+    # Turn into dict RDD with the difference
+    diff_rdd = filtered_rdd.map(lambda kv: {
+        "asin": kv[0],
+        "orig_avg": kv[1][0][0],
+        "calib_avg": kv[1][1][0],
+        "delta": kv[1][1][0] - kv[1][0][0],
+        "count": kv[1][0][1]
+    })
+
+    # Convert to DataFrame / Pandas and plot
+    diff_df = spark.createDataFrame(diff_rdd)
+    pdf = diff_df.toPandas()
+
+    plt.figure(figsize=(6, 6))
+    plt.scatter(pdf["orig_avg"], pdf["calib_avg"])
+    plt.plot([1, 5], [1, 5]) 
+    plt.xlabel("Original avg rating")
+    plt.ylabel("Calibrated avg rating")
+    plt.title("Product average: original vs calibrated")
+    plt.tight_layout()
+    plt.show()
+
+
+    return {
+        "ratings_rdd": ratings_rdd,
+        "avg_rating_per_user_rdd": avg_rating_per_user_rdd,
+        "calibrated_rdd": calib_rate_rdd,
+        "diff_spark_df": diff_df,
+        "diff_pandas_df": pdf
+    }
+
+
