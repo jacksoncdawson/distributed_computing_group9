@@ -725,30 +725,30 @@ def analyze_ratings_from_file(sc, file_path):
         }
     )
 
-    # Convert to DataFrame / Pandas and plot
-    diff_df = spark.createDataFrame(diff_rdd)
-    pdf = diff_df.toPandas()
+    # # Convert to DataFrame / Pandas and plot
+    # diff_df = spark.createDataFrame(diff_rdd)
+    # pdf = diff_df.toPandas()
 
-    plt.figure(figsize=(6, 6))
-    plt.scatter(pdf["orig_avg"], pdf["calib_avg"])
-    plt.plot([1, 5], [1, 5])
-    plt.xlabel("Original avg rating")
-    plt.ylabel("Calibrated avg rating")
-    plt.title("Product average: original vs calibrated")
-    plt.tight_layout()
+    # plt.figure(figsize=(6, 6))
+    # plt.scatter(pdf["orig_avg"], pdf["calib_avg"])
+    # plt.plot([1, 5], [1, 5])
+    # plt.xlabel("Original avg rating")
+    # plt.ylabel("Calibrated avg rating")
+    # plt.title("Product average: original vs calibrated")
+    # plt.tight_layout()
     
-    # Save to GCS instead of showing
-    gcs_filepath = os.path.join(GCS_OUTPUT_BUCKET, "05_seb_calibrated_ratings.png")
-    plt.savefig(gcs_filepath)
-    plt.close()
-    print(f"Seb's analysis complete. Chart saved to: {gcs_filepath}")
+    # # Save to GCS instead of showing
+    # gcs_filepath = os.path.join(GCS_OUTPUT_BUCKET, "05_seb_calibrated_ratings.png")
+    # plt.savefig(gcs_filepath)
+    # plt.close()
+    # print(f"Seb's analysis complete. Chart saved to: {gcs_filepath}")
 
     return {
         "ratings_rdd": ratings_rdd,
         "avg_rating_per_user_rdd": avg_rating_per_user_rdd,
         "calibrated_rdd": calib_rate_rdd,
-        "diff_spark_df": diff_df,
-        "diff_pandas_df": pdf,
+        # "diff_spark_df": diff_df,
+        # "diff_pandas_df": pdf,
     }
 
 
