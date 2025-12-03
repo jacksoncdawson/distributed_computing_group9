@@ -300,92 +300,72 @@ def analyze_books_vs_videogames(sc):
 
 
 # Define Paul's Script
-def process_kindle_reviews_full(sc):
-    print("Starting Paul's analysis...")
-    
-    # 1. READ from GCS input path
-    rdd = sc.textFile(kindle_path) 
+from pyspark import SparkConf, SparkContext
+import json
+
+def analyze_kindle_reviews():
+    json_path = "gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl"
+
+    conf = SparkConf().setAppName("RDD-5000-Sample")
+    sc = SparkContext(conf=conf)
+
+    rdd = sc.textFile(json_path)
     parsed_rdd = rdd.map(lambda line: json.loads(line))
-    
-    # Sampling and structuring RDDs (Logic remains the same)
     sample_rdd = parsed_rdd.takeSample(False, 5000, seed=42)
     sample_rdd = sc.parallelize(sample_rdd)
 
-    sample_rdd = sample_rdd.map(
-        lambda x: (
-            str(x.get('asin', '')), str(x.get('parent_asin', '')), str(x.get('title', '')),
-            str(x.get('text', '')), float(x.get('rating', 0.0)), int(x.get('timestamp', 0)),
-            str(x.get('user_id', '')), bool(x.get('verified_purchase', False)), 
-            int(x.get('helpful_vote', 0)), int(len(x.get('images', [])))
-        )
-    )
+    sample_rdd = sample_rdd.map(lambda x: (
+        str(x.get('asin', '')),
+        str(x.get('parent_asin', '')),
+        str(x.get('title', '')),
+        str(x.get('text', '')),
+        float(x.get('rating', 0.0)),
+        int(x.get('timestamp', 0)),
+        str(x.get('user_id', '')),
+        bool(x.get('verified_purchase', False)),
+        int(x.get('helpful_vote', 0)),
+        int(len(x.get('images', [])))
+    ))
 
-    valid_reviews = sample_rdd.filter(lambda x: x[7] == True).cache()
-    
-    # RATING DISTRIBUTION (Histogram)
-    print("\n--- 1. Saving Rating Distribution Histogram to GCS ---")
-    ratings = valid_reviews.map(lambda x: x[4]).cache() 
-    rating_list = ratings.collect()
-    
-    save_chart_image_to_gcs(
-        rating_list, 
-        'hist', 
-        'Distribution of Verified Review Ratings', 
-        'Star Rating', 
-        'Number of Reviews',
-        '01_rating_distribution.png',
-        GCS_OUTPUT_BUCKET
-    )
-    
-    
-    # AVG RATING BY HELPFUL VOTES (Bar Chart)
+    valid_reviews = sample_rdd.filter(lambda x: x[7] == True)
+
+    ratings = valid_reviews.map(lambda x: x[4])
+    rating_stats = (ratings.count(), ratings.mean(), ratings.stdev(), ratings.min(), ratings.max())
+
     pair_rdd = valid_reviews.map(lambda x: (x[8], (x[4], 1)))
     reduced = pair_rdd.reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1]))
-    avg_ratings_rdd = reduced.mapValues(lambda x: (x[0] / x[1], x[1])) 
-    result = avg_ratings_rdd.sortByKey().map(lambda x: (x[0], x[1][0], x[1][1])).collect()
-    
-    save_chart_image_to_gcs(
-        result, 
-        'bar_avg_rating', 
-        'Avg Rating by Helpful Vote Count (Up to 20 Votes)', 
-        'Number of Helpful Votes', 
-        'Average Star Rating',
-        '02_avg_rating_by_votes.png',
-        GCS_OUTPUT_BUCKET
-    )
-    
-    # GOOD VS. NOT-GOOD RATIO (Pie Chart)
-    good_vs_not = valid_reviews.map(lambda x: (1 if x[4] >= 4 else 0, 1))
-    counts_good = good_vs_not.reduceByKey(lambda x, y: x + y).collect()
-    
-    save_chart_image_to_gcs(
-        counts_good, 
-        'pie', 
-        'Verified Reviews: Good vs. Not Good (>=4 Stars)', 
-        '', 
-        '',
-        '03_good_vs_not_good_ratio.png',
-        GCS_OUTPUT_BUCKET
-    )
-    
-    # AVG TEXT LENGTH BY RATING (Scatter Plot)
-    pair_rdd_len = valid_reviews.map(lambda x: (x[4], (len(x[3]), 1)))
-    reduced_len = pair_rdd_len.reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1]))
-    avgLen = reduced_len.mapValues(lambda x: x[0] / x[1])
-    
-    avg_length_by_rating_list = avgLen.sortByKey().collect()
-    
-    save_chart_image_to_gcs(
-        avg_length_by_rating_list, 
-        'scatter_len', 
-        'Average Review Text Length by Star Rating', 
-        'Star Rating', 
-        'Average Text Length (Characters)',
-        '04_avg_length_by_rating.png',
-        GCS_OUTPUT_BUCKET
-    )
-    
-    print(f"\nPaul's analysis complete. All visualization images have been saved to the GCS path: {GCS_OUTPUT_BUCKET}")
+    helpful_rating_stats = reduced.mapValues(lambda x: (x[0] / x[1], x[1])).sortByKey().collect()
+
+    good_counts = valid_reviews.map(lambda x: (1 if x[4] >= 4 else 0, 1)).reduceByKey(lambda x, y: x + y).collect()
+    bad_counts = valid_reviews.map(lambda x: (1 if x[4] < 3 else 0, 1)).reduceByKey(lambda x, y: x + y).collect()
+
+    total_len, total_count = valid_reviews.map(lambda x: (len(x[3]), 1)).reduce(lambda x, y: (x[0] + y[0], x[1] + y[1]))
+    avg_length = total_len / total_count
+
+    pair_len_rdd = valid_reviews.map(lambda x: (x[4], (len(x[3]), 1)))
+    reduced_len = pair_len_rdd.reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1]))
+    avg_length_by_rating = reduced_len.mapValues(lambda x: x[0] / x[1]).sortByKey().collect()
+
+    sc.stop()
+
+    return {
+        "rating_stats": rating_stats,
+        "helpful_rating_stats": helpful_rating_stats,
+        "good_counts": good_counts,
+        "bad_counts": bad_counts,
+        "avg_length": avg_length,
+        "avg_length_by_rating": avg_length_by_rating
+    }
+
+# Usage
+results = analyze_kindle_reviews()
+print(results["rating_stats"])
+print(results["helpful_rating_stats"][:10])
+print(results["good_counts"])
+print(results["bad_counts"])
+print(results["avg_length"])
+print(results["avg_length_by_rating"])
+
 
 
 # Define Tom's Script
