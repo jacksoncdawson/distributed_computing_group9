@@ -1,11 +1,84 @@
-from pyspark import SparkContext
+from pyspark import SparkContext, SparkConf
 import json
 import math
 from datetime import datetime
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# for patrick's script
+import nltk  # pip install nltk
+from nltk.corpus import stopwords
 
 # GCS Paths
 books_path = "gs://msds-694-cohort-14-group9/data/Books.jsonl"
 video_games_path = "gs://msds-694-cohort-14-group9/data/Video_Games.jsonl"
+kindle_path = "gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl"
+
+GCS_OUTPUT_BUCKET = "gs://msds-694-cohort-14-group9/output"
+
+# Helper Function for Saving Visualizations to GCS
+def save_chart_image_to_gcs(
+    data, chart_type, title, x_label, y_label, filename, gcs_output_path
+):
+    """Generates a chart and saves the image file directly to a GCS path."""
+
+    plt.figure(figsize=(10, 6))
+
+    if chart_type == "hist":
+        plt.hist(data, bins=np.arange(0.5, 6.5, 1.0), edgecolor="black", rwidth=0.8)
+        plt.xticks(np.arange(1, 6, 1))
+
+    elif chart_type == "bar_avg_rating":
+        max_votes_to_plot = 20
+        filtered_data = [
+            item for item in data if item[0] <= max_votes_to_plot and item[2] > 0
+        ]
+        if not filtered_data:
+            print(f"Skipping chart save for '{title}': No valid data.")
+            plt.close()
+            return
+
+        keys = [item[0] for item in filtered_data]
+        values = [item[1] for item in filtered_data]
+        plt.bar(keys, values, color="skyblue")
+        plt.xticks(keys)
+        plt.ylim(0, 5.5)
+
+    elif chart_type == "pie":
+        good_count = next((c for c_type, c in data if c_type == 1), 0)
+        not_good_count = next((c for c_type, c in data if c_type == 0), 0)
+
+        labels = [
+            f"Good (>=4 Stars) - {good_count}",
+            f"Not Good (<4 Stars) - {not_good_count}",
+        ]
+        sizes = [good_count, not_good_count]
+
+        plt.pie(
+            sizes,
+            labels=labels,
+            autopct="%1.1f%%",
+            startangle=90,
+            colors=["#4CAF50", "#F44336"],
+        )
+        plt.axis("equal")
+
+    elif chart_type == "scatter_len":
+        keys = [item[0] for item in data]
+        values = [item[1] for item in data]
+        plt.scatter(keys, values, color="purple", s=100)
+        plt.xticks(np.arange(1, 6, 1))
+
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.grid(axis="y", linestyle="--")
+
+    gcs_filepath = os.path.join(gcs_output_path, filename)
+    plt.savefig(gcs_filepath)
+    plt.close()
+    print(f"Successfully saved visualization to GCS: {gcs_filepath}")
 
 
 # --- SCRIPT DEFINITIONS ---
@@ -227,70 +300,7 @@ def analyze_books_vs_videogames():
     sc.stop()
 
 
-# Define Paul's Function
-from pyspark import SparkConf, SparkContext
-import json
-
-from pyspark import SparkContext, SparkConf
-import json
-import matplotlib.pyplot as plt
-import numpy as np 
-import os 
-
-GCS_INPUT_PATH = "gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl"
-GCS_OUTPUT_BUCKET = "gs://msds-694-cohort-14-group9/output" # Use your bucket name here
-
-# Helper Function for Saving Visualizations to GCS
-def save_chart_image_to_gcs(data, chart_type, title, x_label, y_label, filename, gcs_output_path):
-    """Generates a chart and saves the image file directly to a GCS path."""
-    
-    plt.figure(figsize=(10, 6))
-    
-    if chart_type == 'hist':
-        plt.hist(data, bins=np.arange(0.5, 6.5, 1.0), edgecolor='black', rwidth=0.8)
-        plt.xticks(np.arange(1, 6, 1))
-    
-    elif chart_type == 'bar_avg_rating':
-        max_votes_to_plot = 20
-        filtered_data = [item for item in data if item[0] <= max_votes_to_plot and item[2] > 0]
-        if not filtered_data:
-             print(f"Skipping chart save for '{title}': No valid data.")
-             plt.close()
-             return
-
-        keys = [item[0] for item in filtered_data]
-        values = [item[1] for item in filtered_data]
-        plt.bar(keys, values, color='skyblue')
-        plt.xticks(keys) 
-        plt.ylim(0, 5.5)
-        
-    elif chart_type == 'pie':
-        good_count = next((c for c_type, c in data if c_type == 1), 0)
-        not_good_count = next((c for c_type, c in data if c_type == 0), 0)
-        
-        labels = [f'Good (>=4 Stars) - {good_count}', f'Not Good (<4 Stars) - {not_good_count}']
-        sizes = [good_count, not_good_count]
-
-        plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=['#4CAF50', '#F44336'])
-        plt.axis('equal') 
-    
-    elif chart_type == 'scatter_len':
-        keys = [item[0] for item in data]
-        values = [item[1] for item in data]
-        plt.scatter(keys, values, color='purple', s=100)
-        plt.xticks(np.arange(1, 6, 1))
-    
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.grid(axis='y', linestyle='--')
-
-    gcs_filepath = os.path.join(gcs_output_path, filename)
-    plt.savefig(gcs_filepath)
-    plt.close()
-    print(f"Successfully saved visualization to GCS: {gcs_filepath}")
-
-
+# Define Paul's Script
 def process_kindle_reviews_full():
     conf = SparkConf()
     sc = SparkContext(conf=conf)
@@ -298,7 +308,7 @@ def process_kindle_reviews_full():
     print("Starting PySpark analysis on Dataproc...")
     
     # 1. READ from GCS input path
-    rdd = sc.textFile(GCS_INPUT_PATH) 
+    rdd = sc.textFile(kindle_path) 
     parsed_rdd = rdd.map(lambda line: json.loads(line))
     
     # Sampling and structuring RDDs (Logic remains the same)
@@ -383,7 +393,7 @@ def process_kindle_reviews_full():
     print(f"\nProcessing complete. All visualization images have been saved to the GCS path: {GCS_OUTPUT_BUCKET}")
 
 
-# Tom's Function
+# Define Tom's Script
 def overview_cds_and_vinyl():
 
     def to_year_rating(rec):
@@ -471,13 +481,7 @@ def overview_cds_and_vinyl():
     print("\nEnding overview for CDs and Vinyl category.\n")
 
 
-# Define Patricks function
-from smart_open import open
-import json
-import pyspark
-import nltk # pip install nltk
-from nltk.corpus import stopwords
-
+# Define Patrick's Script
 def analyze_electronics_reviews():
 
     # For uploading data
@@ -485,7 +489,7 @@ def analyze_electronics_reviews():
     filename = "Electronics.jsonl"
     path = f"gs://{bucket}/{filename}"
 
-    sc = pyspark.SparkContext()
+    sc = SparkContext()
     base_rdd = sc.textFile(path).map(json.loads)
 
     def get_average_length_by_rating(base_rdd):
@@ -498,7 +502,7 @@ def analyze_electronics_reviews():
             average_review_length = review_lengths.reduce(lambda x, y: x+y)/filtered_rdd.count()
 
             average_review_length_by_rating[rating] = round(average_review_length, 2)
-        
+
         return average_review_length_by_rating
 
     def get_top_words_by_rating(base_rdd):
@@ -521,7 +525,7 @@ def analyze_electronics_reviews():
             clean_word_rdd = word_rdd.filter(lambda x: x not in stop_words and x not in ['', '>'])
 
             n = clean_word_rdd.count()
-            
+
             word_counts = clean_word_rdd.map(lambda word: (word, 1)).reduceByKey(lambda x, y: x + y)
             sorted_word_counts = word_counts.sortBy(lambda x: x[1], ascending=False)
             sorted_word_ratios = sorted_word_counts.mapValues(lambda x: round(x/n, 5))
@@ -529,7 +533,7 @@ def analyze_electronics_reviews():
             top_words_by_rating[rating] = sorted_word_ratios.take(10)
 
         return top_words_by_rating
-    
+
     rating_lengths, top_words = get_average_length_by_rating(base_rdd), get_top_words_by_rating(base_rdd)
     print(rating_lengths)
     print(top_words)
@@ -538,19 +542,6 @@ def analyze_electronics_reviews():
 
     return rating_lengths, top_words
 
-
-# --- RUN SCRIPTS ---
-
-if __name__ == "__main__":
-    
-    # Run Jack's Script
-    analyze_books_vs_videogames()
-    # Run Paul's
-    process_kindle_reviews_full()
-    # Run Patrick's Script
-    analyze_electronics_reviews()
-    # Run Tom's
-    overview_cds_and_vinyl()
 
 # Seb's Function
 def analyze_ratings_from_file(file_path):
@@ -562,7 +553,7 @@ def analyze_ratings_from_file(file_path):
       4. Calibrate user ratings to have mean 3.0 (for users with ≥ min_reviews_per_user).
       5. Compute per-ASIN original vs calibrated averages.
       6. Plot original vs calibrated product averages.
-      
+
     Only argument required: file_path (string).
     """
 
@@ -573,7 +564,7 @@ def analyze_ratings_from_file(file_path):
     import pyspark
     from pyspark.sql import SparkSession
 
-    sc = pyspark.SparkContext.getOrCreate()
+    sc = SparkContext.getOrCreate()
     spark = SparkSession.builder.getOrCreate()
 
     # Helper to create the typed RDD
@@ -584,21 +575,27 @@ def analyze_ratings_from_file(file_path):
             try:
                 return json.loads(line)
             except json.JSONDecodeError:
-                return None 
+                return None
 
         def has_value(x):
             return x is not None and x != ""
 
         casters = {
-            "int":   lambda x: int(x) if has_value(x) else None,
+            "int": lambda x: int(x) if has_value(x) else None,
             "float": lambda x: float(x) if has_value(x) else None,
-            "str":   lambda x: x if x is not None else "",
-            "bool":  lambda x: (
-                x if isinstance(x, bool)
-                else (x.lower() in ("1", "true", "t", "yes", "y")) if has_value(x)
-                else None
+            "str": lambda x: x if x is not None else "",
+            "bool": lambda x: (
+                x
+                if isinstance(x, bool)
+                else (
+                    (x.lower() in ("1", "true", "t", "yes", "y"))
+                    if has_value(x)
+                    else None
+                )
             ),
-            "date":  lambda x: datetime.fromtimestamp(x / 1000.0).date() if has_value(x) else None
+            "date": lambda x: (
+                datetime.fromtimestamp(x / 1000.0).date() if has_value(x) else None
+            ),
         }
 
         def cast_row_to_dict(record):
@@ -610,8 +607,7 @@ def analyze_ratings_from_file(file_path):
             return casted_dict
 
         return (
-            raw_rdd
-            .map(parse_json_line)
+            raw_rdd.map(parse_json_line)
             .filter(lambda x: x is not None)
             .map(cast_row_to_dict)
         )
@@ -619,16 +615,16 @@ def analyze_ratings_from_file(file_path):
     # Average rating & helpfulness by user
     def avg_rate_by_user(rdd):
         # (user_id, (rating, helpful_vote))
-        user_pairs_rdd = rdd.map(lambda x: (x['user_id'], (x['rating'], x['helpful_vote'])))
+        user_pairs_rdd = rdd.map(
+            lambda x: (x["user_id"], (x["rating"], x["helpful_vote"]))
+        )
 
-        createCombiner   = lambda value: (value[0], value[1], 1)
-        mergeValue       = lambda acc, val: (acc[0] + val[0], acc[1] + val[1], acc[2] + 1)
-        mergeCombiners   = lambda a1, a2: (a1[0] + a2[0], a1[1] + a2[1], a1[2] + a2[2])
+        createCombiner = lambda value: (value[0], value[1], 1)
+        mergeValue = lambda acc, val: (acc[0] + val[0], acc[1] + val[1], acc[2] + 1)
+        mergeCombiners = lambda a1, a2: (a1[0] + a2[0], a1[1] + a2[1], a1[2] + a2[2])
 
         combined_totals_rdd = user_pairs_rdd.combineByKey(
-            createCombiner,
-            mergeValue,
-            mergeCombiners
+            createCombiner, mergeValue, mergeCombiners
         )
 
         averages_rdd = combined_totals_rdd.map(
@@ -636,13 +632,13 @@ def analyze_ratings_from_file(file_path):
                 "user_id": kv[0],
                 "avg_rating": round(kv[1][0] / kv[1][2], 2),
                 "avg_helpfulness": round(kv[1][1] / kv[1][2], 2),
-                "review_count": kv[1][2]
+                "review_count": kv[1][2],
             }
         )
 
         # Sort by avg_helpfulness desc
         rdd_to_sort = averages_rdd.map(
-            lambda record_dict: (record_dict['avg_helpfulness'], record_dict)
+            lambda record_dict: (record_dict["avg_helpfulness"], record_dict)
         )
         sorted_pair_rdd = rdd_to_sort.sortByKey(ascending=False)
         sorted_results_rdd = sorted_pair_rdd.map(lambda kv: kv[1])
@@ -650,7 +646,9 @@ def analyze_ratings_from_file(file_path):
         return sorted_results_rdd
 
     # Calibrated ratings per user
-    def calibrated_ratings_per_user(avg_rating_per_user_rdd, ratings_rdd, min_reviews_per_user=3):
+    def calibrated_ratings_per_user(
+        avg_rating_per_user_rdd, ratings_rdd, min_reviews_per_user=3
+    ):
         """
         Recalibrate ratings so each user's average rating becomes 3.0.
         Optionally ignore users with fewer than `min_reviews_per_user` reviews.
@@ -662,17 +660,13 @@ def analyze_ratings_from_file(file_path):
         )
 
         # (user_id, review_dict)
-        ratings_by_user_rdd = ratings_rdd.map(
-            lambda d: (d["user_id"], d)
-        )
+        ratings_by_user_rdd = ratings_rdd.map(lambda d: (d["user_id"], d))
 
         # (user_id, (review_dict, (avg_rating, review_count)))
         joined_rdd = ratings_by_user_rdd.join(avg_by_user_rdd)
 
         # use users with at least N reviews
-        filtered_rdd = joined_rdd.filter(
-            lambda kv: kv[1][1][1] >= min_reviews_per_user
-        )
+        filtered_rdd = joined_rdd.filter(lambda kv: kv[1][1][1] >= min_reviews_per_user)
 
         def apply_calibration(kv):
             user_id, (review_dict, (avg_rating, review_count)) = kv
@@ -692,19 +686,23 @@ def analyze_ratings_from_file(file_path):
     # Average rating by product helper
     def avg_rating_by_asin(rdd, rating_key):
         # (asin, (sum_rating, count))
-        pair_rdd = rdd.map(lambda x: (x['asin'], (x[rating_key], 1)))
-        summed_rdd = pair_rdd.reduceByKey(
-            lambda a, b: (a[0] + b[0], a[1] + b[1])
-        )
+        pair_rdd = rdd.map(lambda x: (x["asin"], (x[rating_key], 1)))
+        summed_rdd = pair_rdd.reduceByKey(lambda a, b: (a[0] + b[0], a[1] + b[1]))
         # (asin, (avg_rating, count))
-        return summed_rdd.map(
-            lambda kv: (kv[0], (kv[1][0] / kv[1][1], kv[1][1]))
-        )
+        return summed_rdd.map(lambda kv: (kv[0], (kv[1][0] / kv[1][1], kv[1][1])))
 
     # Pipeline
     fields = [
-        "rating", "title", "text", "images", "asin", "parent_asin",
-        "user_id", "timestamp", "helpful_vote", "verified_purchase"
+        "rating",
+        "title",
+        "text",
+        "images",
+        "asin",
+        "parent_asin",
+        "user_id",
+        "timestamp",
+        "helpful_vote",
+        "verified_purchase",
     ]
     types = ["int", "str", "str", "str", "str", "str", "str", "date", "int", "bool"]
 
@@ -716,14 +714,12 @@ def analyze_ratings_from_file(file_path):
 
     # Calibrated ratings (using 3+ reviews as in your example)
     calib_rate_rdd = calibrated_ratings_per_user(
-        avg_rating_per_user_rdd,
-        ratings_rdd,
-        min_reviews_per_user=3
+        avg_rating_per_user_rdd, ratings_rdd, min_reviews_per_user=3
     )
 
     # Original vs calibrated averages per product
-    orig_avg_by_asin_rdd = avg_rating_by_asin(ratings_rdd, 'rating')
-    calib_avg_by_asin_rdd = avg_rating_by_asin(calib_rate_rdd, 'calibrated_rating')
+    orig_avg_by_asin_rdd = avg_rating_by_asin(ratings_rdd, "rating")
+    calib_avg_by_asin_rdd = avg_rating_by_asin(calib_rate_rdd, "calibrated_rating")
 
     # (asin, ((orig_avg, orig_count), (calib_avg, calib_count)))
     joined_rdd = orig_avg_by_asin_rdd.join(calib_avg_by_asin_rdd)
@@ -732,13 +728,15 @@ def analyze_ratings_from_file(file_path):
     filtered_rdd = joined_rdd.filter(lambda kv: kv[1][0][1] > 5)
 
     # Turn into dict RDD with the difference
-    diff_rdd = filtered_rdd.map(lambda kv: {
-        "asin": kv[0],
-        "orig_avg": kv[1][0][0],
-        "calib_avg": kv[1][1][0],
-        "delta": kv[1][1][0] - kv[1][0][0],
-        "count": kv[1][0][1]
-    })
+    diff_rdd = filtered_rdd.map(
+        lambda kv: {
+            "asin": kv[0],
+            "orig_avg": kv[1][0][0],
+            "calib_avg": kv[1][1][0],
+            "delta": kv[1][1][0] - kv[1][0][0],
+            "count": kv[1][0][1],
+        }
+    )
 
     # Convert to DataFrame / Pandas and plot
     diff_df = spark.createDataFrame(diff_rdd)
@@ -746,20 +744,33 @@ def analyze_ratings_from_file(file_path):
 
     plt.figure(figsize=(6, 6))
     plt.scatter(pdf["orig_avg"], pdf["calib_avg"])
-    plt.plot([1, 5], [1, 5]) 
+    plt.plot([1, 5], [1, 5])
     plt.xlabel("Original avg rating")
     plt.ylabel("Calibrated avg rating")
     plt.title("Product average: original vs calibrated")
     plt.tight_layout()
     plt.show()
 
-
     return {
         "ratings_rdd": ratings_rdd,
         "avg_rating_per_user_rdd": avg_rating_per_user_rdd,
         "calibrated_rdd": calib_rate_rdd,
         "diff_spark_df": diff_df,
-        "diff_pandas_df": pdf
+        "diff_pandas_df": pdf,
     }
 
 
+# --- RUN SCRIPTS ---
+
+if __name__ == "__main__":
+    
+    # Run Jack's Script
+    analyze_books_vs_videogames()
+    # Run Paul's
+    process_kindle_reviews_full()
+    # Run Patrick's Script
+    analyze_electronics_reviews()
+    # Run Tom's
+    overview_cds_and_vinyl()
+    # Run Seb's
+    analyze_ratings_from_file(video_games_path)
