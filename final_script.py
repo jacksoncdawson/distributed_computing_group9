@@ -86,11 +86,8 @@ def save_chart_image_to_gcs(
 
 
 # Define Paul's Script
-def analyze_kindle_reviews():
+def analyze_kindle_reviews(sc):
     json_path = "gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl"
-
-    conf = SparkConf().setAppName("RDD-5000-Sample")
-    sc = SparkContext(conf=conf)
 
     rdd = sc.textFile(json_path)
     parsed_rdd = rdd.map(lambda line: json.loads(line))
@@ -128,8 +125,6 @@ def analyze_kindle_reviews():
     pair_len_rdd = valid_reviews.map(lambda x: (x[4], (len(x[3]), 1)))
     reduced_len = pair_len_rdd.reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1]))
     avg_length_by_rating = reduced_len.mapValues(lambda x: x[0] / x[1]).sortByKey().collect()
-
-    sc.stop()
 
     return {
         "rating_stats": rating_stats,
@@ -731,11 +726,11 @@ if __name__ == "__main__":
     sc.setLogLevel("WARN")
 
     try:
-
+        
         # Run Paul's
         print("\n" + "="*80)
         # Usage
-        results = analyze_kindle_reviews()
+        results = analyze_kindle_reviews(sc)
         print(results["rating_stats"])
         print(results["helpful_rating_stats"][:10])
         print(results["good_counts"])
