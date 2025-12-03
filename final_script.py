@@ -17,6 +17,7 @@ kindle_path = "gs://msds-694-cohort-14-group9/data/Kindle_Store.jsonl"
 
 GCS_OUTPUT_BUCKET = "gs://msds-694-cohort-14-group9/output"
 
+
 # Helper Function for Saving Visualizations to GCS
 def save_chart_image_to_gcs(
     data, chart_type, title, x_label, y_label, filename, gcs_output_path
@@ -94,8 +95,6 @@ def analyze_books_vs_videogames():
     - Computes side-by-side comparison statistics
     - Provides detailed breakdowns of ratings, review lengths, helpfulness, and verified purchases
     """
-
-
 
     # Setup SparkContext
     sc = SparkContext.getOrCreate()
