@@ -85,7 +85,7 @@ def save_chart_image_to_gcs(
 # --- SCRIPT DEFINITIONS ---
 
 # Define Jack's Script
-def analyze_books_vs_videogames():
+def analyze_books_vs_videogames(sc):
     """
     Analyze consumer sentiment differences between video-game products and book products.
 
@@ -96,8 +96,8 @@ def analyze_books_vs_videogames():
     - Provides detailed breakdowns of ratings, review lengths, helpfulness, and verified purchases
     """
 
-    # Setup SparkContext
-    sc = SparkContext.getOrCreate()
+    # Use provided SparkContext
+    print("Starting Jack's analysis...")
 
     # Read JSONL files as text RDDs and parse each line
     vg_rdd = sc.textFile(video_games_path).map(json.loads)
@@ -296,15 +296,12 @@ def analyze_books_vs_videogames():
         print(f"  Verified Count: {stats['verified']}")
         print(f"  Verified Percentage: {percentage:.2f}%")
 
-    sc.stop()
+    print("Completed Jack's analysis.")
 
 
 # Define Paul's Script
-def process_kindle_reviews_full():
-    conf = SparkConf()
-    sc = SparkContext(conf=conf)
-    
-    print("Starting PySpark analysis on Dataproc...")
+def process_kindle_reviews_full(sc):
+    print("Starting Paul's analysis...")
     
     # 1. READ from GCS input path
     rdd = sc.textFile(kindle_path) 
@@ -388,12 +385,11 @@ def process_kindle_reviews_full():
         GCS_OUTPUT_BUCKET
     )
     
-    sc.stop()
-    print(f"\nProcessing complete. All visualization images have been saved to the GCS path: {GCS_OUTPUT_BUCKET}")
+    print(f"\nPaul's analysis complete. All visualization images have been saved to the GCS path: {GCS_OUTPUT_BUCKET}")
 
 
 # Define Tom's Script
-def overview_cds_and_vinyl():
+def overview_cds_and_vinyl(sc):
 
     def to_year_rating(rec):
         """
@@ -416,8 +412,6 @@ def overview_cds_and_vinyl():
         Pure RDD version: write CSV via saveAsTextFile, no pyspark.sql.
         year_results is a list of (year, (avg_rating, count)).
         """
-        sc = SparkContext.getOrCreate()
-
         # Prepare header + data lines
         header = "year,avg_rating,num_ratings"
         data_lines = [
@@ -426,20 +420,16 @@ def overview_cds_and_vinyl():
         ]
 
         # Create an RDD with header + lines
-        rdd = sc.parallelize([header] + data_lines)
+        year_rdd = sc.parallelize([header] + data_lines)
 
         # One output file, plain text CSV
-        (
-        rdd.coalesce(1).saveAsTextFile(output_path)
-        )
+        year_rdd.coalesce(1).saveAsTextFile(output_path)
 
-    print("\nStarting overview for CDs and Vinyl category...\n")
+    print("\nStarting Tom's overview for CDs and Vinyl category...\n")
     category = "CDs_and_Vinyl"
     data_path = f'gs://msds-694-cohort-14-group9/data/{category}.jsonl'
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     output_path = f'gs://msds-694-cohort-14-group9/output/{category}_yearly_avg_ratings_{ts}/'
-    sc = SparkContext(appName="CDsAndVinylRDD").getOrCreate()
-    sc.setLogLevel("ERROR")
 
     path = str(data_path)
 
@@ -476,19 +466,19 @@ def overview_cds_and_vinyl():
 
     save_year_stats(year_results, output_path)
 
-    sc.stop()
-    print("\nEnding overview for CDs and Vinyl category.\n")
+    print("\nTom's analysis complete for CDs and Vinyl category.\n")
 
 
 # Define Patrick's Script
-def analyze_electronics_reviews():
+def analyze_electronics_reviews(sc):
 
+    print("Starting Patrick's analysis...")
+    
     # For uploading data
     bucket = "msds-694-cohort-14-group9/data"
     filename = "Electronics.jsonl"
     path = f"gs://{bucket}/{filename}"
 
-    sc = SparkContext()
     base_rdd = sc.textFile(path).map(json.loads)
 
     def get_average_length_by_rating(base_rdd):
@@ -505,9 +495,13 @@ def analyze_electronics_reviews():
         return average_review_length_by_rating
 
     def get_top_words_by_rating(base_rdd):
-
-        nltk.download('stopwords')
-        stop_words = set(stopwords.words('english'))
+        try:
+            nltk.download('stopwords', quiet=True)
+            stop_words = set(stopwords.words('english'))
+        except Exception as e:
+            print(f"Warning: Could not download NLTK stopwords: {e}")
+            # Use a basic set of stopwords as fallback
+            stop_words = set(['the', 'a', 'an', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'this', 'that', 'it', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can'])
 
         def parse_review(text):
             problem_chars = ['.','><br','/', '-']
@@ -537,13 +531,12 @@ def analyze_electronics_reviews():
     print(rating_lengths)
     print(top_words)
 
-    sc.stop()
-
+    print("Patrick's analysis complete.")
     return rating_lengths, top_words
 
 
 # Seb's Function
-def analyze_ratings_from_file(file_path):
+def analyze_ratings_from_file(sc, file_path):
     """
     Full pipeline:
       1. Read newline-delimited JSON reviews from `file_path` into an RDD.
@@ -551,19 +544,14 @@ def analyze_ratings_from_file(file_path):
       3. Compute average rating & helpfulness per user.
       4. Calibrate user ratings to have mean 3.0 (for users with ≥ min_reviews_per_user).
       5. Compute per-ASIN original vs calibrated averages.
-      6. Plot original vs calibrated product averages.
+      6. Save plot to GCS instead of showing it.
 
     Only argument required: file_path (string).
     """
-
-    import json
-    from datetime import datetime
-    import matplotlib.pyplot as plt
-
-    import pyspark
+    print("Starting Seb's analysis...")
+    
     from pyspark.sql import SparkSession
 
-    sc = SparkContext.getOrCreate()
     spark = SparkSession.builder.getOrCreate()
 
     # Helper to create the typed RDD
@@ -748,7 +736,12 @@ def analyze_ratings_from_file(file_path):
     plt.ylabel("Calibrated avg rating")
     plt.title("Product average: original vs calibrated")
     plt.tight_layout()
-    plt.show()
+    
+    # Save to GCS instead of showing
+    gcs_filepath = os.path.join(GCS_OUTPUT_BUCKET, "05_seb_calibrated_ratings.png")
+    plt.savefig(gcs_filepath)
+    plt.close()
+    print(f"Seb's analysis complete. Chart saved to: {gcs_filepath}")
 
     return {
         "ratings_rdd": ratings_rdd,
@@ -763,13 +756,41 @@ def analyze_ratings_from_file(file_path):
 
 if __name__ == "__main__":
     
-    # Run Jack's Script
-    analyze_books_vs_videogames()
-    # Run Paul's
-    process_kindle_reviews_full()
-    # Run Patrick's Script
-    analyze_electronics_reviews()
-    # Run Tom's
-    overview_cds_and_vinyl()
-    # Run Seb's
-    analyze_ratings_from_file(video_games_path)
+    # Create a single SparkContext for all analyses
+    print("Initializing Spark...")
+    conf = SparkConf().setAppName("GroupAnalysis")
+    sc = SparkContext(conf=conf)
+    sc.setLogLevel("WARN")
+    
+    try:
+        # Run Jack's Script
+        print("\n" + "="*80)
+        analyze_books_vs_videogames(sc)
+        
+        # Run Paul's
+        print("\n" + "="*80)
+        process_kindle_reviews_full(sc)
+        
+        # Run Patrick's Script
+        print("\n" + "="*80)
+        analyze_electronics_reviews(sc)
+        
+        # Run Tom's
+        print("\n" + "="*80)
+        overview_cds_and_vinyl(sc)
+        
+        # Run Seb's
+        print("\n" + "="*80)
+        analyze_ratings_from_file(sc, video_games_path)
+        
+        print("\n" + "="*80)
+        print("All analyses completed successfully!")
+        
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Stop SparkContext at the very end
+        sc.stop()
+        print("SparkContext stopped.")
