@@ -1,0 +1,183 @@
+Initializing Spark...
+25/12/03 05:50:39 INFO SparkEnv: Registering MapOutputTracker
+25/12/03 05:50:39 INFO SparkEnv: Registering BlockManagerMaster
+25/12/03 05:50:40 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+25/12/03 05:50:40 INFO SparkEnv: Registering OutputCommitCoordinator
+25/12/03 05:50:41 INFO MetricsConfig: Loaded properties from hadoop-metrics2.properties
+25/12/03 05:50:41 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
+25/12/03 05:50:41 INFO MetricsSystemImpl: google-hadoop-file-system metrics system started
+25/12/03 05:50:41 INFO DataprocSparkPlugin: Registered 188 driver metrics
+25/12/03 05:50:42 INFO DefaultNoHARMFailoverProxyProvider: Connecting to ResourceManager at cluster-65f5-bigger2-m.us-west1-c.c.careful-mapper-478218-v4.internal./10.138.0.9:8032
+25/12/03 05:50:42 INFO AHSProxy: Connecting to Application History server at cluster-65f5-bigger2-m.us-west1-c.c.careful-mapper-478218-v4.internal./10.138.0.9:10200
+25/12/03 05:50:43 INFO Configuration: resource-types.xml not found
+25/12/03 05:50:43 INFO ResourceUtils: Unable to find 'resource-types.xml'.
+25/12/03 05:50:44 INFO YarnClientImpl: Submitted application application_1764740382748_0003
+25/12/03 05:50:45 INFO DefaultNoHARMFailoverProxyProvider: Connecting to ResourceManager at cluster-65f5-bigger2-m.us-west1-c.c.careful-mapper-478218-v4.internal./10.138.0.9:8030
+25/12/03 05:50:47 INFO GoogleCloudStorageImpl: Ignoring exception of type GoogleJsonResponseException; verified object already exists with desired state.
+25/12/03 05:50:48 INFO GoogleHadoopOutputStream: hflush(): No-op due to rate limit (RateLimiter[stableRate=0.2qps]): readers will *not* yet see flushed data for gs://dataproc-temp-us-west1-298273863550-x746gu7c/c26182dd-00e1-4e61-863e-358ad5d1538d/spark-job-history/application_1764740382748_0003.inprogress [CONTEXT ratelimit_period="1 MINUTES" ]
+
+================================================================================
+(3348, 4.445937873357229, 0.9717046377116434, 1.0, 5.0)
+[(0, (4.5354523227383865, 2454)), (1, (4.351648351648351, 546)), (2, (4.214814814814815, 135)), (3, (3.9855072463768115, 69)), (4, (3.74468085106383, 47)), (5, (4.0625, 16)), (6, (4.130434782608695, 23)), (7, (4.5, 12)), (8, (3.888888888888889, 9)), (9, (2.25, 4))]
+[(0, 450), (1, 2898)]
+[(0, 3144), (1, 204)]
+273.1263440860215
+[(1.0, 239.64077669902912), (2.0, 372.1287128712871), (3.0, 308.5975609756098), (4.0, 286.6651234567901), (5.0, 262.4377777777778)]
+
+================================================================================
+Starting Patrick's analysis...
+[nltk_data] Error loading stopwords: <urlopen error [Errno 101]
+[nltk_data]     Network is unreachable>
+Warning: Could not download NLTK stopwords: 
+**********************************************************************
+  Resource stopwords not found.
+  Please use the NLTK Downloader to obtain the resource:
+
+  >>> import nltk
+  >>> nltk.download('stopwords')
+  
+  For more information see: https://www.nltk.org/data.html
+
+  Attempted to load corpora/stopwords
+
+  Searched in:
+    - '/root/nltk_data'
+    - '/opt/conda/default/nltk_data'
+    - '/opt/conda/default/share/nltk_data'
+    - '/opt/conda/default/lib/nltk_data'
+    - '/usr/share/nltk_data'
+    - '/usr/local/share/nltk_data'
+    - '/usr/lib/nltk_data'
+    - '/usr/local/lib/nltk_data'
+**********************************************************************
+
+{1: 272.08, 2: 353.9, 3: 348.22, 4: 332.09, 5: 197.07}
+{1: [('i', 0.04304), ('not', 0.01977), ('my', 0.01498), ('you', 0.00872), ('they', 0.00754), ('one', 0.00685), ('work', 0.00646), ('so', 0.00638), ('no', 0.00604), ('after', 0.00549)], 2: [('i', 0.04263), ('not', 0.01648), ('my', 0.01469), ('you', 0.00992), ('so', 0.00683), ('they', 0.00664), ('one', 0.00626), ('if', 0.00604), ('when', 0.00555), ('just', 0.00543)], 3: [('i', 0.04176), ('not', 0.01538), ('my', 0.01477), ('you', 0.01122), ('so', 0.00727), ('if', 0.00692), ('they', 0.00624), ('one', 0.00584), ('when', 0.0054), ('just', 0.00534)], 4: [('i', 0.04095), ('my', 0.01607), ('not', 0.01115), ('you', 0.01101), ('so', 0.00791), ('good', 0.00717), ('very', 0.00626), ('great', 0.0062), ('if', 0.00607), ('like', 0.00556)], 5: [('i', 0.04339), ('my', 0.02164), ('great', 0.01187), ('you', 0.00933), ('very', 0.0087), ('so', 0.00827), ('not', 0.00704), ('good', 0.00654), ('works', 0.0064), ('one', 0.00576)]}
+Patrick's analysis complete.
+
+================================================================================
+
+Starting Tom's overview for CDs and Vinyl category...
+
+Number of records: 4827273
+First record: {'rating': 5.0, 'title': 'Five Stars', 'text': 'LOVE IT!', 'images': [], 'asin': 'B002MW50JA', 'parent_asin': 'B002MW50JA', 'user_id': 'AGKASBHYZPGTEPO6LWZPVJWB2BVA', 'timestamp': 1452650777000, 'helpful_vote': 0, 'verified_purchase': True}
+1997: Average Rating: 4.833, Review Count: 24
+1998: Average Rating: 4.547, Review Count: 7380
+1999: Average Rating: 4.447, Review Count: 27133
+2000: Average Rating: 4.396, Review Count: 95324
+2001: Average Rating: 4.366, Review Count: 89957
+2002: Average Rating: 4.357, Review Count: 95478
+2003: Average Rating: 4.308, Review Count: 110524
+2004: Average Rating: 4.255, Review Count: 129027
+2005: Average Rating: 4.234, Review Count: 164747
+2006: Average Rating: 4.296, Review Count: 138376
+2007: Average Rating: 4.376, Review Count: 147966
+2008: Average Rating: 4.369, Review Count: 125889
+2009: Average Rating: 4.393, Review Count: 125788
+2010: Average Rating: 4.396, Review Count: 120042
+2011: Average Rating: 4.416, Review Count: 125915
+2012: Average Rating: 4.478, Review Count: 166466
+2013: Average Rating: 4.560, Review Count: 349416
+2014: Average Rating: 4.600, Review Count: 455669
+2015: Average Rating: 4.624, Review Count: 522083
+2016: Average Rating: 4.630, Review Count: 419753
+2017: Average Rating: 4.610, Review Count: 338495
+2018: Average Rating: 4.589, Review Count: 268074
+2019: Average Rating: 4.590, Review Count: 249134
+2020: Average Rating: 4.463, Review Count: 177066
+2021: Average Rating: 4.472, Review Count: 192173
+2022: Average Rating: 4.435, Review Count: 137117
+2023: Average Rating: 4.431, Review Count: 48257
+
+Tom's analysis complete for CDs and Vinyl category.
+
+
+================================================================================
+Starting Seb's analysis...
+
+================================================================================
+Starting Jack's analysis...
+
+Category: book
+  Total Reviews: 29475453
+  Avg Rating: 4.41
+  Stddev Rating: 1.07
+  Avg Review Length: 423.08
+  Stddev Review Length: 751.78
+  Avg Title Length: 25.46
+  Avg Helpful Votes: 1.78
+  Total Helpful Votes: 52381607
+  Verified Purchases: 20566389
+  Avg Images Per Review: 0.03
+
+Category: video_game
+  Total Reviews: 4624615
+  Avg Rating: 4.05
+  Stddev Rating: 1.43
+  Avg Review Length: 307.59
+  Stddev Review Length: 647.59
+  Avg Title Length: 22.89
+  Avg Helpful Votes: 1.23
+  Total Helpful Votes: 5678950
+  Verified Purchases: 3982807
+  Avg Images Per Review: 0.08
+
+RATING DISTRIBUTION COMPARISON
+================================================================================
+rating     book            video_game     
+----------------------------------------
+0.0        4               0              
+1.0        1316085         589519         
+2.0        1080897         249878         
+3.0        2054057         340086         
+4.0        4632932         617251         
+5.0        20391478        2827881        
+
+
+REVIEW LENGTH QUARTILES
+================================================================================
+
+Category: book
+  Min Length: 0
+  25th Percentile: 74
+  Median: 175
+  75th Percentile: 443
+  Max Length: 37878
+
+Category: video_game
+  Min Length: 0
+  25th Percentile: 47
+  Median: 129
+  75th Percentile: 305
+  Max Length: 36893
+
+
+HELPFULNESS STATISTICS
+================================================================================
+
+Category: book
+  Max Helpful Votes: 18130
+  Reviews with Helpful Votes: 10666772
+
+Category: video_game
+  Max Helpful Votes: 10369
+  Reviews with Helpful Votes: 1167726
+
+
+VERIFIED PURCHASE ANALYSIS
+================================================================================
+
+Category: book
+  Total Reviews: 29475453
+  Verified Count: 20566389
+  Verified Percentage: 69.77%
+
+Category: video_game
+  Total Reviews: 4624615
+  Verified Count: 3982807
+  Verified Percentage: 86.12%
+Completed Jack's analysis.
+
+================================================================================
+All analyses completed successfully!
+SparkContext stopped.
